@@ -1,14 +1,56 @@
-name: Meu Pipeline
+name: Pipeline de Testes
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout do repositório
-      uses: actions/checkout@v2
+      - name: Checkout do repositório
+        uses: actions/checkout@v2
 
-    - name: Hello, World
-      run: echo "Hello, World"
+      - name: Configurar ambiente Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'lts' # Isso configurará para a versão LTS mais recente, você pode ajustar se necessário
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Executar testes automatizados
+        run: npm run test # Substitua isso pelo seu comando de teste
+
+      - name: Exibir resultados dos testes
+        if: always() # Isso garante que a etapa seja executada mesmo se os testes falharem
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-results
+          path: path/to/test/results # Substitua pelo caminho onde os resultados dos testes estão
+
+      - name: Publicar resultados dos testes no GitHub Actions
+        if: always() # Isso garante que a etapa seja executada mesmo se os testes falharem
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            const testResultsPath = 'path/to/test/results'; // Substitua pelo mesmo caminho usado acima
+            const testResults = fs.readFileSync(testResultsPath, 'utf8');
+            
+            const payload = {
+              name: 'Test Results',
+              head_sha: process.env.GITHUB_SHA,
+              status: 'completed',
+              conclusion: testResults.includes('failure') ? 'failure' : 'success', // Avalia se houve falhas nos testes
+              output: {
+                title: 'Test Results',
+                summary: testResults
+              }
+            };
+
+            await github.actions.createWorkflowRunStatus(payload)
